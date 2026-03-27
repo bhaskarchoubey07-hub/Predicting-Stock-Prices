@@ -54,8 +54,6 @@ python -m streamlit run app.py
 - The `LSTM` option is shown only when TensorFlow is available in the Python environment.
 - On Python `3.14`, TensorFlow wheels may not be available yet, so the UI automatically hides LSTM in that case.
 - The app is ready for Streamlit Community Cloud or GitHub-based deployment workflows.
-- Keep `requirements.txt` as the production dependency file for the published app.
-- Use `requirements-lstm-local.txt` only for a separate local TensorFlow environment.
 
 ## Advanced Forecasting Models
 

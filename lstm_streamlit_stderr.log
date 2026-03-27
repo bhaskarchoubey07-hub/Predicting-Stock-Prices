@@ -1,0 +1,15 @@
+2026-03-27 00:46:25.261 No ASGI app assignments found in C:\Users\bhask\OneDrive\Documents\Predicting Stock Prices\app.py
+2026-03-27 00:46:25.658 Filtered 90 packages down to 2 candidates for component scanning
+2026-03-27 00:46:25.683 Scanning 2 candidate packages for component manifests using 2 worker threads
+2026-03-27 00:46:25.760 Found 0 component manifests total
+2026-03-27 00:46:25.764 No asset roots to watch
+2026-03-27 00:46:25.767 File watching not started
+2026-03-27 00:46:25.769 Starting new event loop for server
+2026-03-27 00:46:25.773 Starting server...
+2026-03-27 00:46:25.774 Serving static content from C:\Users\bhask\OneDrive\Documents\Predicting Stock Prices\.venv-lstm\Lib\site-packages\streamlit\static
+2026-03-27 00:46:25.775 Port 8501 not available, trying to use the next one.
+2026-03-27 00:46:25.776 Port 8502 not available, trying to use the next one.
+2026-03-27 00:46:25.776 Port 8503 not available, trying to use the next one.
+2026-03-27 00:46:25.778 Server started on port 8504
+2026-03-27 00:46:25.778 Runtime state: RuntimeState.INITIAL -> RuntimeState.NO_SESSIONS_CONNECTED
+2026-03-27 00:46:26.423 Setting up signal handler

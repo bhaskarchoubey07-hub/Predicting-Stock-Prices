@@ -7,3 +7,7 @@ scikit-learn
 prophet
 requests
 streamlit-autorefresh
+scipy
+transformers
+torch
+openai
