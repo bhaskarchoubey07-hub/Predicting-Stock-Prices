@@ -96,7 +96,7 @@ CUSTOM_CSS = """
 
 MIN_HISTORY_ROWS = 120
 LSTM_SEQUENCE_LENGTH = 60
-LSTM_EPOCHS = 12
+LSTM_EPOCHS = 20
 NSE_MASTER_URLS = [
     "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv",
     "https://archives.nseindia.com/content/equities/EQUITY_L.csv",
@@ -426,7 +426,7 @@ def train_prophet_model(serialized_df: str) -> Prophet:
         daily_seasonality=False,
         weekly_seasonality=True,
         yearly_seasonality=True,
-        changepoint_prior_scale=0.08,
+        changepoint_prior_scale=0.15,
         seasonality_mode="multiplicative",
     )
     model.fit(prophet_df)
@@ -511,7 +511,9 @@ def train_lstm_model(serialized_values: str, sequence_length: int, epochs: int) 
 
     model = Sequential(
         [
-            LSTM(64, return_sequences=True, input_shape=(sequence_length, 1)),
+            LSTM(128, return_sequences=True, input_shape=(sequence_length, 1)),
+            Dropout(0.2),
+            LSTM(64, return_sequences=True),
             Dropout(0.2),
             LSTM(32),
             Dropout(0.2),
@@ -775,7 +777,8 @@ def format_currency(value: float) -> str:
 
 def main() -> None:
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-    st_autorefresh(interval=30_000, key="stock-data-refresh")
+    refresh_count = st_autorefresh(interval=30_000, key="stock-data-refresh")
+    refresh_timestamp = datetime.now().strftime("%d %b %Y %I:%M:%S %p")
 
     st.markdown(
         """
@@ -788,6 +791,11 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    refresh_cols = st.columns([1.3, 1.1, 1.6])
+    refresh_cols[0].metric("Auto Refresh", "Every 30 sec")
+    refresh_cols[1].metric("Refresh Count", int(refresh_count))
+    refresh_cols[2].metric("Last App Rerun", refresh_timestamp)
 
     company_master = fetch_indian_company_master()
     default_label = "Infosys (INFY.NS)"

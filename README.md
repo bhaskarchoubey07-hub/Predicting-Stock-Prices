@@ -8,8 +8,8 @@ A production-oriented Streamlit web app for live Indian stock tracking and forec
 - Searchable Indian stock universe using a live NSE company master with bundled fallback symbols
 - Historical price analysis for 1 to 3 years
 - Moving averages, daily returns, and trend detection
-- Forecasting with Prophet
-- Optional LSTM support when TensorFlow is available
+- Forecasting with Prophet (optimized for volatility with 0.15 changepoint scale)
+- Deep LSTM support (128-64-32 unit architecture) for complex pattern recognition
 - Interactive Plotly charts
 - Prediction table with expected change and growth or decline signal
 - Caching for faster reloads
@@ -54,6 +54,29 @@ python -m streamlit run app.py
 - The `LSTM` option is shown only when TensorFlow is available in the Python environment.
 - On Python `3.14`, TensorFlow wheels may not be available yet, so the UI automatically hides LSTM in that case.
 - The app is ready for Streamlit Community Cloud or GitHub-based deployment workflows.
+- Keep `requirements.txt` as the production dependency file for the published app.
+- Use `requirements-lstm-local.txt` only for a separate local TensorFlow environment.
+
+## Advanced Forecasting Models
+
+The app uses two high-performance models:
+1. **Prophet**: Configured with a `changepoint_prior_scale` of `0.15` to capture rapid market shifts and high volatility.
+2. **Deep LSTM**: A 3-layer neural network (128, 64, and 32 units) trained over 20 epochs for deep sequence learning.
+
+## Local LSTM Setup
+
+Use a separate Python `3.10` to `3.13` virtual environment for LSTM.
+
+Example:
+
+```bash
+py -3.13 -m venv .venv-lstm
+.venv-lstm\Scripts\activate
+pip install -r requirements-lstm-local.txt
+streamlit run app.py
+```
+
+If TensorFlow installs successfully in that environment, the app will automatically show the `LSTM` option again.
 
 ## GitHub Push
 
