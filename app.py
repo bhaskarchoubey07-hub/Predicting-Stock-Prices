@@ -1,224 +1,692 @@
 from __future__ import annotations
 
-import io
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
-import requests
+import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
-from plotly.subplots import make_subplots
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
+from prophet import Prophet
 from streamlit_autorefresh import st_autorefresh
-from scipy.optimize import minimize
-import openai
 
-# --- MODULAR UTILS (INLINE FOR DEPLOYMENT) ---
+try:
+    import openai
+except Exception:
+    openai = None
+
+try:
+    from transformers import pipeline
+
+    TRANSFORMERS_AVAILABLE = True
+except Exception:
+    TRANSFORMERS_AVAILABLE = False
+
+
+st.set_page_config(
+    page_title="FinAI Super App",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
+CUSTOM_CSS = """
+<style>
+    :root {
+        --bg: #f4efe6;
+        --bg-soft: #fbf7f1;
+        --ink: #14213d;
+        --muted: #5b6577;
+        --accent: #0b6e4f;
+        --accent-2: #d97706;
+        --accent-3: #7c3aed;
+        --rose: #be123c;
+        --card: rgba(255,255,255,0.78);
+        --border: rgba(20, 33, 61, 0.08);
+        --shadow: 0 22px 60px rgba(20, 33, 61, 0.10);
+    }
+    .stApp {
+        background:
+            radial-gradient(circle at 10% 0%, rgba(11, 110, 79, 0.18), transparent 26%),
+            radial-gradient(circle at 100% 10%, rgba(217, 119, 6, 0.16), transparent 24%),
+            radial-gradient(circle at 50% 100%, rgba(124, 58, 237, 0.10), transparent 28%),
+            linear-gradient(180deg, #f7f2e9 0%, #f2f6f3 50%, #eef3fa 100%);
+        color: var(--ink);
+    }
+    .stSidebar > div:first-child {
+        background:
+            linear-gradient(180deg, rgba(20,33,61,0.97) 0%, rgba(16,24,40,0.96) 100%);
+        color: #f8fafc;
+        border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .stSidebar label, .stSidebar p, .stSidebar div[data-testid="stMarkdownContainer"] {
+        color: #e5edf8;
+    }
+    .stSidebar .stRadio label, .stSidebar .stSelectbox label, .stSidebar .stTextInput label {
+        color: #f9fafb;
+    }
+    .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div {
+        border-radius: 16px !important;
+    }
+    .block-container {
+        padding-top: 1.6rem;
+        padding-bottom: 2rem;
+    }
+    .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 1.6rem 1.8rem;
+        border-radius: 28px;
+        background:
+            linear-gradient(135deg, rgba(20,33,61,0.95) 0%, rgba(11,110,79,0.92) 55%, rgba(217,119,6,0.88) 100%);
+        color: #fff7ed;
+        box-shadow: var(--shadow);
+        margin-bottom: 1rem;
+    }
+    .hero:before {
+        content: "";
+        position: absolute;
+        inset: auto -8% -45% auto;
+        width: 260px;
+        height: 260px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.09);
+        filter: blur(2px);
+    }
+    .hero h1 {
+        margin: 0;
+        font-size: 2.7rem;
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+        font-family: "Georgia", "Palatino Linotype", serif;
+    }
+    .hero p {
+        margin: 0.7rem 0 0 0;
+        max-width: 760px;
+        color: rgba(255,247,237,0.88);
+        font-size: 1rem;
+    }
+    .hero-strip {
+        display: flex;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+    }
+    .hero-pill {
+        padding: 0.55rem 0.9rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.16);
+        font-size: 0.88rem;
+        color: #fffaf2;
+    }
+    .glass-card {
+        border-radius: 24px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        padding: 1rem 1.1rem;
+        backdrop-filter: blur(12px);
+    }
+    .section-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--ink);
+        margin-bottom: 0.25rem;
+    }
+    .section-copy {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+    }
+    .metric-tile {
+        border-radius: 22px;
+        padding: 1rem 1.05rem;
+        background: rgba(255,255,255,0.86);
+        border: 1px solid rgba(20,33,61,0.08);
+        box-shadow: 0 14px 32px rgba(20,33,61,0.08);
+        min-height: 128px;
+    }
+    .metric-label {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.74rem;
+        font-weight: 700;
+    }
+    .metric-value {
+        color: var(--ink);
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        margin-top: 0.35rem;
+    }
+    .metric-delta {
+        margin-top: 0.55rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+    .metric-foot {
+        margin-top: 0.35rem;
+        font-size: 0.82rem;
+        color: var(--muted);
+    }
+    .positive { color: var(--accent); }
+    .negative { color: var(--rose); }
+    .neutral { color: var(--accent-2); }
+    .subtle-chip {
+        display: inline-block;
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        background: rgba(20,33,61,0.05);
+        border: 1px solid rgba(20,33,61,0.08);
+        color: var(--ink);
+        font-size: 0.83rem;
+        font-weight: 700;
+        margin-right: 0.45rem;
+        margin-bottom: 0.45rem;
+    }
+    .chat-frame {
+        border-radius: 24px;
+        padding: 1rem;
+        background: rgba(255,255,255,0.76);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+    }
+    div[data-testid="stDataFrame"], div[data-testid="stPlotlyChart"] {
+        border-radius: 22px;
+        overflow: hidden;
+    }
+    .footer-note {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-top: 0.6rem;
+    }
+</style>
+"""
+
+
+PLOT_TEMPLATE = dict(
+    paper_bgcolor="rgba(255,255,255,0)",
+    plot_bgcolor="rgba(255,255,255,0)",
+    font=dict(color="#14213d", family="Trebuchet MS, Segoe UI, sans-serif"),
+    margin=dict(l=20, r=20, t=56, b=20),
+)
+
+
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
 
 class FinanceAdvisor:
     @staticmethod
-    def get_ai_response(user_input, context=""):
-        # This acts as a smart advisor using context
-        api_key = st.secrets.get("OPENAI_API_KEY")
-        if api_key:
+    def get_ai_response(user_input: str, context: str = "") -> str:
+        api_key = st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None
+        if api_key and openai is not None:
             openai.api_key = api_key
             try:
                 response = openai.ChatCompletion.create(
                     model="gpt-3.5-turbo",
                     messages=[
-                        {"role": "system", "content": f"You are a helpful Fintech AI. Context: {context}"},
-                        {"role": "user", "content": user_input}
-                    ]
+                        {"role": "system", "content": f"You are a helpful Fintech AI assistant. Context: {context}"},
+                        {"role": "user", "content": user_input},
+                    ],
                 )
                 return response.choices[0].message.content
-            except:
+            except Exception:
                 pass
 
-        # Rule-based fallback
-        low_input = user_input.lower()
-        if "bullish" in low_input: return "Market shows bullish signals when the 20-day MA stays above the 50-day MA."
-        if "risk" in low_input: return "Diversification and monitoring the Sharpe Ratio are key to managing risk."
-        return "I can help with stock trends, sentiment, and portfolio optimization. Try asking about a specific stock!"
+        prompt = user_input.lower()
+        if "bullish" in prompt:
+            return "Bullish structure usually strengthens when shorter moving averages stay above longer ones and price respects that slope."
+        if "risk" in prompt:
+            return "Risk control starts with sizing, diversification, and knowing how much drawdown you can accept before entering a trade."
+        if "portfolio" in prompt:
+            return "A healthy portfolio balances return, volatility, and correlation rather than chasing the strongest recent winner."
+        return "I can help with stock trends, sentiment, forecast signals, and portfolio questions. Ask about a ticker or investing scenario."
 
-# Optional ML Imports
-try:
-    from prophet import Prophet
-    PROPHET_AVAILABLE = True
-except Exception:
-    Prophet = None
-    PROPHET_AVAILABLE = False
 
-try:
-    from transformers import pipeline
-    import torch
-    TRANSFORMERS_AVAILABLE = True
-except Exception:
-    TRANSFORMERS_AVAILABLE = False
-
-# --- CONFIGURATION ---
-st.set_page_config(
-    page_title="FinAI Super App",
-    page_icon="🧠",
-    layout="wide",
-)
-
-CUSTOM_CSS = """
-<style>
-    .stApp {
-        background: radial-gradient(circle at top left, rgba(11, 132, 255, 0.08), transparent 30%),
-                    linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%);
-        color: #111827;
-    }
-    .metric-card {
-        padding: 1.5rem;
-        border-radius: 12px;
-        background: white;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border: 1px solid #e5e7eb;
-    }
-</style>
-"""
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-# --- CACHING & DATA ---
-
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_sentiment_model():
     if TRANSFORMERS_AVAILABLE:
-        return pipeline("sentiment-analysis", model="ProsusAI/finbert")
+        try:
+            return pipeline("sentiment-analysis", model="ProsusAI/finbert")
+        except Exception:
+            return None
     return None
 
-@st.cache_data(ttl=300)
-def fetch_stock_data(ticker, years):
-    data = yf.download(ticker, period=f"{years}y", interval="1d", auto_adjust=True, progress=False)
-    if data.empty: return pd.DataFrame()
-    if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+
+@st.cache_data(ttl=25, show_spinner=False)
+def fetch_stock_data(ticker: str, years: int) -> pd.DataFrame:
+    data = yf.download(
+        ticker,
+        period=f"{years}y",
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        threads=False,
+    )
+    if data.empty:
+        return pd.DataFrame()
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
     data = data.reset_index()
     data.columns = [str(col).title() for col in data.columns]
+    data["Date"] = pd.to_datetime(data["Date"])
     return data
 
-@st.cache_data(ttl=600)
-def fetch_news(ticker_symbol):
+
+@st.cache_data(ttl=60, show_spinner=False)
+def fetch_news(ticker_symbol: str) -> list[dict]:
     try:
-        t = yf.Ticker(ticker_symbol)
-        news = t.news
-        return [{
-            "title": n.get("title", ""),
-            "publisher": n.get("publisher", ""),
-            "time": datetime.fromtimestamp(n.get("providerPublishTime", 0)).strftime('%Y-%m-%d %H:%M')
-        } for n in news[:10]]
-    except: return []
+        ticker = yf.Ticker(ticker_symbol)
+        news = ticker.news or []
+        return [
+            {
+                "title": item.get("title", ""),
+                "publisher": item.get("publisher", ""),
+                "time": datetime.fromtimestamp(item.get("providerPublishTime", 0)).strftime("%Y-%m-%d %H:%M"),
+            }
+            for item in news[:10]
+        ]
+    except Exception:
+        return []
 
-# --- FEATURES ---
 
-def run_prediction_ui(ticker, years, pred_days):
+def apply_plot_style(fig: go.Figure, title: str, height: int = 420) -> go.Figure:
+    fig.update_layout(
+        title=title,
+        height=height,
+        template="plotly_white",
+        **PLOT_TEMPLATE,
+    )
+    fig.update_xaxes(showgrid=False, zeroline=False)
+    fig.update_yaxes(gridcolor="rgba(20,33,61,0.08)", zeroline=False)
+    return fig
+
+
+def render_metric_tile(label: str, value: str, delta: str, foot: str, tone: str = "neutral") -> None:
+    st.markdown(
+        f"""
+        <div class="metric-tile">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{value}</div>
+            <div class="metric-delta {tone}">{delta}</div>
+            <div class="metric-foot">{foot}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_section_header(title: str, copy: str) -> None:
+    st.markdown(
+        f"""
+        <div class="section-title">{title}</div>
+        <div class="section-copy">{copy}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def run_prediction_ui(ticker: str, years: int, pred_days: int) -> None:
     df = fetch_stock_data(ticker, years)
     if df.empty:
-        st.error("Invalid Ticker")
+        st.error("No market data was returned for this ticker. Try a valid NSE or BSE symbol such as `INFY.NS` or `RELIANCE.NS`.")
         return
 
-    df["MA20"] = df["Close"].rolling(window=20).mean()
-    df["MA50"] = df["Close"].rolling(window=50).mean()
+    df["MA20"] = df["Close"].rolling(window=20, min_periods=1).mean()
+    df["MA50"] = df["Close"].rolling(window=50, min_periods=1).mean()
+    df["Daily Return"] = df["Close"].pct_change().fillna(0)
 
-    curr, ma20, ma50 = df["Close"].iloc[-1], df["MA20"].iloc[-1], df["MA50"].iloc[-1]
+    current_price = float(df["Close"].iloc[-1])
+    ma20 = float(df["MA20"].iloc[-1])
+    ma50 = float(df["MA50"].iloc[-1])
+    trend_up = ma20 > ma50
+    trend_text = "Uptrend" if trend_up else "Downtrend"
+    trend_icon = "📈" if trend_up else "📉"
+    day_change = float(df["Daily Return"].iloc[-1] * 100)
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Current Price", f"₹{curr:.2f}")
-    c2.metric("20-Day MA", f"₹{ma20:.2f}")
-    c3.metric("50-Day MA", f"₹{ma50:.2f}")
-    c4.metric("Trend", "📈 Uptrend" if ma20 > ma50 else "📉 Downtrend")
-
-    if PROPHET_AVAILABLE:
-        m = Prophet(changepoint_prior_scale=0.15, daily_seasonality=False)
-        m.fit(df[["Date", "Close"]].rename(columns={"Date": "ds", "Close": "y"}))
-        future = m.make_future_dataframe(periods=pred_days)
-        forecast = m.predict(future)
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df["Date"], y=df["Close"], name="History"))
-        fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], name="AI Forecast", line=dict(dash='dash')))
-        st.plotly_chart(fig, use_container_width=True)
+    prophet_frame = df[["Date", "Close"]].rename(columns={"Date": "ds", "Close": "y"})
+    forecast = None
+    if len(df) > 90:
+        model = Prophet(
+            changepoint_prior_scale=0.15,
+            daily_seasonality=False,
+            weekly_seasonality=True,
+            yearly_seasonality=True,
+        )
+        model.fit(prophet_frame)
+        forecast = model.predict(model.make_future_dataframe(periods=pred_days))
+        predicted_price = float(forecast["yhat"].iloc[-1])
+        expected_change = ((predicted_price - current_price) / current_price) * 100 if current_price else 0.0
     else:
-        st.warning("Forecasting disabled: Prophet not installed.")
+        predicted_price = current_price
+        expected_change = 0.0
 
-def run_sentiment_ui():
-    ticker = st.text_input("Enter Ticker for News", value="RELIANCE.NS")
-    if ticker:
-        with st.spinner("Analyzing Sentiment..."):
-            news = fetch_news(ticker)
-            model = load_sentiment_model()
-            results = []
-            for n in news:
-                label, score = ("Neutral", 0.0)
-                if model:
-                    res = model(n['title'])[0]
-                    label, score = res['label'], res['score']
-                results.append({
-                    "Headline": n['title'], "Sentiment": label.upper(), "Impact": "📈" if label=="positive" else "📉" if label=="negative" else "➖"
-                })
+    metric_cols = st.columns(4)
+    with metric_cols[0]:
+        render_metric_tile("Current Price", f"₹{current_price:,.2f}", f"{day_change:+.2f}% today", "Latest adjusted close", "positive" if day_change >= 0 else "negative")
+    with metric_cols[1]:
+        render_metric_tile("20-Day MA", f"₹{ma20:,.2f}", trend_icon + " " + trend_text, "Fast trend signal", "positive" if trend_up else "negative")
+    with metric_cols[2]:
+        render_metric_tile("50-Day MA", f"₹{ma50:,.2f}", f"{(ma20 - ma50):+,.2f}", "Longer market rhythm", "positive" if ma20 >= ma50 else "negative")
+    with metric_cols[3]:
+        render_metric_tile("AI Forecast", f"₹{predicted_price:,.2f}", f"{expected_change:+.2f}% outlook", f"Next {pred_days} trading days", "positive" if expected_change >= 0 else "negative")
 
-            res_df = pd.DataFrame(results)
-            col1, col2 = st.columns([2, 1])
-            col1.dataframe(res_df, use_container_width=True)
-            if not res_df.empty:
-                fig = px.pie(res_df, names='Sentiment', title="Sentiment Distribution")
-                col2.plotly_chart(fig, use_container_width=True)
+    overview_col, chips_col = st.columns([3.2, 1.2])
+    with overview_col:
+        render_section_header(
+            "Market Storyboard",
+            "Historical price, moving-average structure, and the Prophet forecast are layered together so you can read momentum and forward drift in one place.",
+        )
+    with chips_col:
+        st.markdown(
+            f"""
+            <div class="glass-card">
+                <div class="subtle-chip">Ticker: {ticker}</div>
+                <div class="subtle-chip">Window: {years}Y</div>
+                <div class="subtle-chip">Forecast: {pred_days}D</div>
+                <div class="subtle-chip">Refresh: 30s</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-def run_portfolio_ui():
-    stocks = st.text_input("Tickers (comma separated)", value="AAPL, MSFT, RELIANCE.NS")
-    if st.button("Optimize Portfolio"):
-        tickers = [s.strip() for s in stocks.split(",")]
-        data = yf.download(tickers, period="1y")['Close'].pct_change().dropna()
+    main_chart = go.Figure()
+    main_chart.add_trace(
+        go.Scatter(
+            x=df["Date"],
+            y=df["Close"],
+            mode="lines",
+            name="Close",
+            line=dict(color="#14213d", width=3),
+        )
+    )
+    main_chart.add_trace(
+        go.Scatter(
+            x=df["Date"],
+            y=df["MA20"],
+            mode="lines",
+            name="20-Day MA",
+            line=dict(color="#0b6e4f", width=2.5),
+        )
+    )
+    main_chart.add_trace(
+        go.Scatter(
+            x=df["Date"],
+            y=df["MA50"],
+            mode="lines",
+            name="50-Day MA",
+            line=dict(color="#d97706", width=2.5),
+        )
+    )
+    if forecast is not None:
+        future = forecast.tail(pred_days)
+        main_chart.add_trace(
+            go.Scatter(
+                x=future["ds"],
+                y=future["yhat"],
+                mode="lines+markers",
+                name="AI Forecast",
+                line=dict(color="#7c3aed", width=3, dash="dash"),
+            )
+        )
+        main_chart.add_trace(
+            go.Scatter(
+                x=future["ds"],
+                y=future["yhat_upper"],
+                mode="lines",
+                line=dict(color="rgba(124,58,237,0)"),
+                showlegend=False,
+            )
+        )
+        main_chart.add_trace(
+            go.Scatter(
+                x=future["ds"],
+                y=future["yhat_lower"],
+                mode="lines",
+                line=dict(color="rgba(124,58,237,0)"),
+                fill="tonexty",
+                fillcolor="rgba(124,58,237,0.12)",
+                name="Forecast Range",
+            )
+        )
+    apply_plot_style(main_chart, "Historical Price and Forecast Canvas", height=500)
+    st.plotly_chart(main_chart, use_container_width=True)
 
-        num = len(tickers)
-        weights = np.array(num * [1./num])
+    lower, upper = st.columns([1.6, 1])
+    with lower:
+        signal_chart = go.Figure()
+        signal_chart.add_trace(
+            go.Bar(
+                x=df["Date"].tail(45),
+                y=(df["Daily Return"].tail(45) * 100),
+                marker_color=np.where(df["Daily Return"].tail(45) >= 0, "#0b6e4f", "#be123c"),
+                name="Daily Return %",
+            )
+        )
+        apply_plot_style(signal_chart, "Recent Return Pulse", height=360)
+        st.plotly_chart(signal_chart, use_container_width=True)
 
-        ret = np.sum(data.mean() * weights) * 252
-        vol = np.sqrt(np.dot(weights.T, np.dot(data.cov() * 252, weights)))
+    with upper:
+        forecast_table = pd.DataFrame()
+        if forecast is not None:
+            forecast_table = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(pred_days).copy()
+            forecast_table.columns = ["Date", "Forecast", "Lower", "Upper"]
+            forecast_table["Date"] = forecast_table["Date"].dt.strftime("%Y-%m-%d")
+            forecast_table["Expected Change %"] = ((forecast_table["Forecast"] - current_price) / current_price) * 100
+            forecast_table["Signal"] = np.where(forecast_table["Expected Change %"] >= 0, "Growth", "Pullback")
+        render_section_header("Forward Price Map", "A compact forecast table for the upcoming horizon.")
+        st.dataframe(
+            forecast_table.style.format(
+                {
+                    "Forecast": "₹{:,.2f}",
+                    "Lower": "₹{:,.2f}",
+                    "Upper": "₹{:,.2f}",
+                    "Expected Change %": "{:+.2f}%",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
 
-        st.subheader("Current Portfolio Stats")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Annual Return", f"{ret:.2%}")
-        c2.metric("Volatility", f"{vol:.2%}")
-        c3.metric("Sharpe Ratio", f"{(ret - 0.06)/vol:.2f}")
 
-def run_chat_ui():
-    if "messages" not in st.session_state: st.session_state.messages = []
+def run_sentiment_ui(default_ticker: str) -> None:
+    render_section_header(
+        "Headline Moodboard",
+        "News headlines are clustered into a fast sentiment snapshot so you can gauge whether the narrative around a stock is supportive, cautious, or mixed.",
+    )
+    ticker = st.text_input("Ticker for news sentiment", value=default_ticker)
+    news = fetch_news(ticker)
+    if not news:
+        st.warning("No recent news was returned for this ticker.")
+        return
 
-    for m in st.session_state.messages:
-        with st.chat_message(m["role"]): st.markdown(m["content"])
+    with st.spinner("Reading the tone of recent headlines..."):
+        model = load_sentiment_model()
+        results = []
+        for item in news:
+            label, score = ("neutral", 0.0)
+            if model:
+                result = model(item["title"])[0]
+                label, score = result["label"].lower(), float(result["score"])
+            impact = "📈" if "pos" in label else "📉" if "neg" in label else "➖"
+            results.append(
+                {
+                    "Headline": item["title"],
+                    "Publisher": item["publisher"],
+                    "Time": item["time"],
+                    "Sentiment": label.title(),
+                    "Confidence": score,
+                    "Impact": impact,
+                }
+            )
 
-    if prompt := st.chat_input("Ask me anything about stocks..."):
+    sentiment_df = pd.DataFrame(results)
+    left, right = st.columns([1.7, 1])
+    with left:
+        st.dataframe(
+            sentiment_df.style.format({"Confidence": "{:.2f}"}),
+            use_container_width=True,
+            hide_index=True,
+        )
+    with right:
+        pie = px.pie(
+            sentiment_df,
+            names="Sentiment",
+            color="Sentiment",
+            color_discrete_map={"Positive": "#0b6e4f", "Negative": "#be123c", "Neutral": "#d97706"},
+            hole=0.58,
+        )
+        pie.update_traces(textposition="inside", textinfo="percent+label")
+        apply_plot_style(pie, "Narrative Balance", height=380)
+        st.plotly_chart(pie, use_container_width=True)
+
+
+def run_portfolio_ui() -> None:
+    render_section_header(
+        "Portfolio Atmosphere",
+        "Get a quick read on return, volatility, and diversification pressure from a basket of tickers.",
+    )
+    stocks = st.text_input("Tickers", value="AAPL, MSFT, RELIANCE.NS")
+    if not st.button("Analyze Portfolio", use_container_width=True):
+        return
+
+    tickers = [symbol.strip() for symbol in stocks.split(",") if symbol.strip()]
+    data = yf.download(tickers, period="1y", auto_adjust=True, progress=False)["Close"]
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+    returns = data.pct_change().dropna()
+    if returns.empty:
+        st.error("Not enough data was returned for that basket.")
+        return
+
+    count = len(tickers)
+    weights = np.array(count * [1.0 / count])
+    annual_return = np.sum(returns.mean() * weights) * 252
+    volatility = np.sqrt(np.dot(weights.T, np.dot(returns.cov() * 252, weights)))
+    sharpe = (annual_return - 0.06) / volatility if volatility else 0.0
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        render_metric_tile("Annual Return", f"{annual_return:.2%}", "Portfolio drift", "Higher is better", "positive" if annual_return >= 0 else "negative")
+    with c2:
+        render_metric_tile("Volatility", f"{volatility:.2%}", "Risk profile", "Annualized variation", "neutral")
+    with c3:
+        render_metric_tile("Sharpe Ratio", f"{sharpe:.2f}", "Risk-adjusted return", "Using 6% risk-free rate", "positive" if sharpe >= 1 else "neutral")
+
+    chart_left, chart_right = st.columns([1.5, 1])
+    with chart_left:
+        cumulative = (1 + returns).cumprod()
+        line = go.Figure()
+        for column in cumulative.columns:
+            line.add_trace(
+                go.Scatter(
+                    x=cumulative.index,
+                    y=cumulative[column],
+                    mode="lines",
+                    name=str(column),
+                    line=dict(width=2.2),
+                )
+            )
+        apply_plot_style(line, "Relative Performance Wave", height=390)
+        st.plotly_chart(line, use_container_width=True)
+    with chart_right:
+        alloc = pd.DataFrame({"Ticker": tickers, "Weight": weights})
+        donut = px.pie(
+            alloc,
+            names="Ticker",
+            values="Weight",
+            hole=0.55,
+            color_discrete_sequence=["#14213d", "#0b6e4f", "#d97706", "#7c3aed", "#be123c", "#2563eb"],
+        )
+        apply_plot_style(donut, "Equal-Weight Mix", height=390)
+        st.plotly_chart(donut, use_container_width=True)
+
+
+def run_chat_ui(active_ticker: str) -> None:
+    render_section_header(
+        "AI Advisor Lounge",
+        "A cleaner space for conversation, strategy questions, and quick market explanations with context from your active ticker.",
+    )
+    st.markdown('<div class="chat-frame">', unsafe_allow_html=True)
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Ask about momentum, risk, entries, or portfolio health..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-        resp = FinanceAdvisor.get_ai_response(prompt)
-        st.session_state.messages.append({"role": "assistant", "content": resp})
-        with st.chat_message("assistant"): st.markdown(resp)
+        context = f"Current selected ticker: {active_ticker}"
+        response = FinanceAdvisor.get_ai_response(prompt, context=context)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        with st.chat_message("assistant"):
+            st.markdown(response)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# --- MAIN ---
 
-def main():
-    st_autorefresh(interval=30000, key="sync")
-    st.sidebar.title("🧠 FinAI Super App")
-    st.sidebar.caption("AI-Powered Financial Intelligence")
+def main() -> None:
+    refresh_count = st_autorefresh(interval=30_000, key="sync")
+    rerun_time = datetime.now().strftime("%d %b %Y %I:%M:%S %p")
 
-    menu = ["📈 Stock Prediction", "📰 News Sentiment", "📊 Portfolio Analyzer", "🤖 AI Advisor"]
-    selected = st.sidebar.radio("Navigation", menu)
-    st.sidebar.divider()
-    st.sidebar.info(f"Last Updated: {datetime.now().strftime('%H:%M:%S')}")
+    st.markdown(
+        f"""
+        <div class="hero">
+            <h1>FinAI Super App</h1>
+            <p>
+                Live market storytelling for Indian equities with elegant forecasting, richer news context,
+                portfolio diagnostics, and a more cinematic investing dashboard.
+            </p>
+            <div class="hero-strip">
+                <span class="hero-pill">Auto refresh every 30 seconds</span>
+                <span class="hero-pill">Refresh count: {int(refresh_count)}</span>
+                <span class="hero-pill">Last rerun: {rerun_time}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    if selected == "📈 Stock Prediction":
-        ticker = st.sidebar.text_input("Symbol", value="INFY.NS")
-        run_prediction_ui(ticker, 2, 15)
-    elif selected == "📰 News Sentiment": run_sentiment_ui()
-    elif selected == "📊 Portfolio Analyzer": run_portfolio_ui()
-    elif selected == "🤖 AI Advisor": run_chat_ui()
+    with st.sidebar:
+        st.title("FinAI Control Deck")
+        st.caption("A richer command center for prediction, sentiment, portfolio signals, and AI guidance.")
+
+        active_ticker = st.text_input("Primary ticker", value="INFY.NS")
+        history_years = st.select_slider("History window", options=[1, 2, 3], value=2)
+        forecast_days = st.slider("Forecast horizon", min_value=7, max_value=30, value=15)
+        selected = st.radio(
+            "Choose experience",
+            ["Stock Prediction", "News Sentiment", "Portfolio Analyzer", "AI Advisor"],
+        )
+        st.markdown("---")
+        st.markdown(
+            f"""
+            <div class="glass-card">
+                <div class="section-title" style="font-size:1rem;">Live Session</div>
+                <div class="footer-note">Ticker: <strong>{active_ticker}</strong></div>
+                <div class="footer-note">Last refresh: {rerun_time}</div>
+                <div class="footer-note">Auto refresh cycle: 30 seconds</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if selected == "Stock Prediction":
+        run_prediction_ui(active_ticker, history_years, forecast_days)
+    elif selected == "News Sentiment":
+        run_sentiment_ui(active_ticker)
+    elif selected == "Portfolio Analyzer":
+        run_portfolio_ui()
+    else:
+        run_chat_ui(active_ticker)
+
 
 if __name__ == "__main__":
     main()
