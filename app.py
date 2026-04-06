@@ -47,6 +47,43 @@ CUSTOM_CSS = """
         --border: rgba(20, 33, 61, 0.08);
         --shadow: 0 22px 60px rgba(20, 33, 61, 0.10);
     }
+    @keyframes fadeSlideUp {
+        0% {
+            opacity: 0;
+            transform: translateY(18px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes softFloat {
+        0%, 100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-6px);
+        }
+    }
+    @keyframes glowPulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.18);
+        }
+        50% {
+            box-shadow: 0 0 0 10px rgba(217, 119, 6, 0.02);
+        }
+    }
+    @keyframes gradientDrift {
+        0% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+        100% {
+            background-position: 0% 50%;
+        }
+    }
     .stApp {
         background:
             radial-gradient(circle at 10% 0%, rgba(11, 110, 79, 0.18), transparent 26%),
@@ -54,12 +91,15 @@ CUSTOM_CSS = """
             radial-gradient(circle at 50% 100%, rgba(124, 58, 237, 0.10), transparent 28%),
             linear-gradient(180deg, #f7f2e9 0%, #f2f6f3 50%, #eef3fa 100%);
         color: var(--ink);
+        background-size: 120% 120%;
+        animation: gradientDrift 22s ease-in-out infinite;
     }
     .stSidebar > div:first-child {
         background:
             linear-gradient(180deg, rgba(20,33,61,0.97) 0%, rgba(16,24,40,0.96) 100%);
         color: #f8fafc;
         border-right: 1px solid rgba(255,255,255,0.08);
+        animation: fadeSlideUp 0.75s ease-out;
     }
     .stSidebar label, .stSidebar p, .stSidebar div[data-testid="stMarkdownContainer"] {
         color: #e5edf8;
@@ -84,6 +124,7 @@ CUSTOM_CSS = """
         color: #fff7ed;
         box-shadow: var(--shadow);
         margin-bottom: 1rem;
+        animation: fadeSlideUp 0.75s ease-out;
     }
     .hero:before {
         content: "";
@@ -94,6 +135,7 @@ CUSTOM_CSS = """
         border-radius: 999px;
         background: rgba(255,255,255,0.09);
         filter: blur(2px);
+        animation: softFloat 6s ease-in-out infinite;
     }
     .hero h1 {
         margin: 0;
@@ -121,7 +163,11 @@ CUSTOM_CSS = """
         border: 1px solid rgba(255,255,255,0.16);
         font-size: 0.88rem;
         color: #fffaf2;
+        animation: fadeSlideUp 0.7s ease-out both, glowPulse 3.8s ease-in-out infinite;
     }
+    .hero-pill:nth-child(1) { animation-delay: 0.08s, 0s; }
+    .hero-pill:nth-child(2) { animation-delay: 0.16s, 0s; }
+    .hero-pill:nth-child(3) { animation-delay: 0.24s, 0s; }
     .glass-card {
         border-radius: 24px;
         background: var(--card);
@@ -129,6 +175,13 @@ CUSTOM_CSS = """
         box-shadow: var(--shadow);
         padding: 1rem 1.1rem;
         backdrop-filter: blur(12px);
+        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        animation: fadeSlideUp 0.85s ease-out both;
+    }
+    .glass-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 26px 60px rgba(20, 33, 61, 0.14);
+        border-color: rgba(11, 110, 79, 0.18);
     }
     .section-title {
         font-size: 1.15rem;
@@ -148,7 +201,18 @@ CUSTOM_CSS = """
         border: 1px solid rgba(20,33,61,0.08);
         box-shadow: 0 14px 32px rgba(20,33,61,0.08);
         min-height: 128px;
+        transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+        animation: fadeSlideUp 0.7s ease-out both;
     }
+    .metric-tile:hover {
+        transform: translateY(-6px) scale(1.01);
+        box-shadow: 0 22px 44px rgba(20, 33, 61, 0.14);
+        border-color: rgba(124, 58, 237, 0.16);
+    }
+    .metric-tile:nth-of-type(1) { animation-delay: 0.06s; }
+    .metric-tile:nth-of-type(2) { animation-delay: 0.12s; }
+    .metric-tile:nth-of-type(3) { animation-delay: 0.18s; }
+    .metric-tile:nth-of-type(4) { animation-delay: 0.24s; }
     .metric-label {
         color: var(--muted);
         text-transform: uppercase;
@@ -194,10 +258,37 @@ CUSTOM_CSS = """
         background: rgba(255,255,255,0.76);
         border: 1px solid var(--border);
         box-shadow: var(--shadow);
+        animation: fadeSlideUp 0.85s ease-out;
     }
     div[data-testid="stDataFrame"], div[data-testid="stPlotlyChart"] {
         border-radius: 22px;
         overflow: hidden;
+        animation: fadeSlideUp 0.95s ease-out both;
+    }
+    div[data-testid="stPlotlyChart"] {
+        transition: transform 0.24s ease, box-shadow 0.24s ease;
+    }
+    div[data-testid="stPlotlyChart"]:hover {
+        transform: translateY(-4px);
+    }
+    div[data-testid="column"] {
+        animation: fadeSlideUp 0.75s ease-out both;
+    }
+    div[data-testid="column"]:nth-child(1) { animation-delay: 0.05s; }
+    div[data-testid="column"]:nth-child(2) { animation-delay: 0.12s; }
+    div[data-testid="column"]:nth-child(3) { animation-delay: 0.19s; }
+    div[data-testid="column"]:nth-child(4) { animation-delay: 0.26s; }
+    .stButton > button {
+        border-radius: 999px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        box-shadow: 0 10px 24px rgba(20, 33, 61, 0.12);
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 16px 28px rgba(20, 33, 61, 0.18);
+    }
+    .stChatMessage {
+        animation: fadeSlideUp 0.45s ease-out both;
     }
     .footer-note {
         color: var(--muted);
