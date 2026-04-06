@@ -1,6 +1,8 @@
 # AI Stock Price Predictor
+# 🧠 FinAI: AI-Powered Financial Intelligence Platform
 
 A production-oriented Streamlit web app for live Indian stock tracking and forecasting using `yfinance`, `Prophet`, and an optional `LSTM` path.
+A modular, production-ready Streamlit web application that provides a suite of AI-powered tools for financial analysis.
 
 ## Features
 
@@ -14,6 +16,33 @@ A production-oriented Streamlit web app for live Indian stock tracking and forec
 - Prediction table with expected change and growth or decline signal
 - Caching for faster reloads
 - Error handling for invalid or unsupported symbols
+The platform is divided into four core modules:
+
+1.  **📈 Stock Prediction**:
+    -   Fetches live stock data using `yfinance`.
+    -   Calculates and displays 20-day and 50-day Moving Averages and detects trends.
+    -   Uses Facebook's `Prophet` model for time-series forecasting.
+    -   Visualizes historical data, AI forecasts, and confidence intervals using Plotly.
+    -   Provides an "AI Insights" panel with expected price change.
+
+2.  **📰 News Sentiment Analysis**:
+    -   Fetches the latest financial news for any stock ticker.
+    -   Analyzes headlines using the `ProsusAI/finbert` model for financial sentiment.
+    -   Displays sentiment (Positive, Negative, Neutral), confidence scores, and market impact emojis.
+    -   Includes a pie chart for sentiment distribution.
+
+3.  **📊 Portfolio Analyzer**:
+    -   Analyzes a portfolio of multiple stocks based on Modern Portfolio Theory (MPT).
+    -   Calculates performance for both an equal-weighted and an AI-optimized portfolio.
+    -   Optimizes asset allocation to maximize the Sharpe Ratio using `scipy.optimize`.
+    -   Displays key metrics: Annual Return, Volatility, and Sharpe Ratio.
+    -   Visualizes the optimal asset allocation with a pie chart.
+
+4.  **🤖 AI Financial Advisor**:
+    -   A conversational chatbot for financial queries.
+    -   Powered by OpenAI's GPT models (requires API key).
+    -   Includes a rule-based fallback for operation without an API key.
+    -   Features a clean chat interface with scrollable history and quick-action prompts.
 
 ## Project Structure
 
@@ -25,6 +54,20 @@ A production-oriented Streamlit web app for live Indian stock tracking and forec
 |-- .gitignore
 `-- .streamlit/
     `-- config.toml
+├── app.py              # Main Streamlit app runner
+├── modules/            # UI and logic for each feature
+│   ├── __init__.py
+│   ├── chatbot.py
+│   ├── portfolio.py
+│   ├── sentiment.py
+│   └── stock_prediction.py
+├── utils/              # Reusable utility functions
+│   ├── __init__.py
+│   ├── chatbot.py
+│   ├── data.py
+│   └── models.py
+├── requirements.txt
+└── README.md
 ```
 
 ## Local Run
